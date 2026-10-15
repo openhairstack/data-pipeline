@@ -4,27 +4,29 @@ Labeling follicles is a skill that takes ~15 minutes to learn and one coffee bre
 
 ## What a follicular unit is
 
-A follicular unit (FU) is the naturally-occurring bundle of 1–5+ hair shafts emerging from a single pore. Transplant grafts are cut from these bundles — **graft size = hair count per unit**, which is exactly what the model must learn. Your annotation directly trains the classifier that tells a surgeon how big each graft is.
+A follicular unit (FU) is the naturally-occurring bundle of 1–5+ hair shafts emerging from a single pore. Transplant grafts are cut from these bundles — **graft size = hair count per unit**, which is exactly what the model must learn. Your annotation directly trains the classifier that estimates graft size, the number transplant planning is based on.
 
 ## Our taxonomy (v0.1)
 
-Draw one box per follicular unit. Tag it by how many hair shafts you can *confidently* see emerging from the pore:
+Draw one box per follicular unit. Tag it by how many hair shafts you can *confidently* see emerging from the pore — the classes are exact counts:
 
 | Tag | Hairs per unit |
 |---|---|
 | `fu1` | 1 |
-| `fu2` | 2–3 |
-| `fu3` | 4–5 |
-| `fu4` | 6+ |
-| `fu5` | cannot tell — blur, occlusion, motion, blown-out highlight |
+| `fu2` | 2 |
+| `fu3` | 3 |
+| `fu4` | 4 |
+| `fu5` | 5+ (rare; count everything above four as `fu5`) |
 
-`fu5` is not a failure. Forcing a guess poisons training data. If you cannot count it, tag `fu5` and move on. Over-use of `fu5` (>20% of a batch) means the image is bad — flag it.
+Can't count a unit confidently — blur, occlusion, motion, blown-out highlight? **Skip it; don't
+guess.** Forcing a guess poisons training data. If you're skipping many units, the image is
+probably unusable — flag it for the batch owner.
 
 ## Drawing rules
 
 1. **One box per pore, not per hair.** A box enclosing three hairs that share one pore = one `fu2`, not three boxes.
 2. **Tight to the bundle.** Corners just outside the outermost shafts, not around the scalp region.
-3. **OBB encouraged.** Follicles emerge at an angle; axis-aligned boxes waste signal. Our format supports oriented boxes — use the tool's rotation if available.
+3. **Axis-aligned boxes for v0.1.** Draw the rectangle tight to the bundle. Oriented boxes (OBB) are a later milestone — don't use tool rotation in this round.
 4. **Partial FUs at image edge:** label them normally if ≥1 shaft emergence is visible; skip if cut off before the pore.
 5. **Never guess follicle geometry under heavy scaling artifacts.** Digital trichoscopes (and phone macro shots) distort at frame edges.
 

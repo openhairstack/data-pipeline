@@ -4,10 +4,10 @@ Every dataset published under this project must ship a card based on this file, 
 
 ---
 
-name: `follicle-obb-vX.Y`
+name: `follicle-vX.Y`
 license: `cc-by-4.0`
 language: `n/a` (images)
-task: object-detection / instance-segmentation (bbox, fu1–fu5)
+task: object-detection (axis-aligned boxes, classes fu1–fu5)
 
 ## Provenance
 
@@ -22,7 +22,7 @@ task: object-detection / instance-segmentation (bbox, fu1–fu5)
 | val | | | |
 | test | | | |
 
-Classes: `fu1` `fu2` `fu3` `fu4` `fu5` = number of hair shafts per follicular unit (2–3, 4–5, 6+ buckets). `fu5` = unreadable/ambiguous.
+Classes: `fu1` `fu2` `fu3` `fu4` `fu5` = hair shafts per follicular unit (exact counts 1–4; `fu5` = 5 or more).
 
 ## Collection process
 
@@ -41,7 +41,7 @@ Result of `scripts/validate_dataset.py --path <this dir> --strict`, pasted verba
 How to cite the source datasets (each source has its own required attribution) and this release:
 
 ```bibtex
-@misc{openhairstack_follicle_obb_vX_Y,
+@misc{openhairstack_follicle_vX_Y,
   title  = {Open Hair Stack Follicle Unit Dataset vX.Y},
   author = {Open Hair Stack contributors},
   year   = {2026},

@@ -1,7 +1,7 @@
 # data-pipeline
 
 > **The foundation:** every openly-licensed hair-follicle dataset consolidated, validated,
-> and documented — plus the tools to build the biggest freely-usable scalp dataset in existence.
+> and documented — plus the tools to grow the largest freely-usable scalp dataset we can get to.
 
 ### In plain English
 
@@ -25,7 +25,7 @@ broken data before it poisons a model.
 |---|---|
 | `DATASETS.md` | the manifest: every known public dataset, its license, its status |
 | `scripts/download_datasets.py` | fetches every license-clean source in one command |
-| `scripts/convert_to_yolo_obb.py` | builds a canonical release from any export |
+| `scripts/convert_to_yolo.py` | builds a canonical release from any export (class mapping from the export's data.yaml) |
 | `scripts/validate_dataset.py` | integrity + format + split-leakage checker |
 | `ANNOTATION_GUIDE.md` | how to label follicular units (the 15-minute skill) |
 | `schema/dataset_card.md` | provenance card every release must ship |
@@ -40,8 +40,8 @@ pip install -r requirements.txt
 python scripts/download_datasets.py --out ./data/raw --set clean
 
 # 2. convert + validate into a canonical release
-python scripts/convert_to_yolo_obb.py --input ./data/raw --output ./data/follicle-obb-v0.1
-python scripts/validate_dataset.py --path ./data/follicle-obb-v0.1
+python scripts/convert_to_yolo.py --input ./data/raw --output ./data/follicle-v0.1
+python scripts/validate_dataset.py --path ./data/follicle-v0.1
 ```
 
 Run the tests without downloading anything:
@@ -51,19 +51,20 @@ python tests/test_pipeline.py   # synthetic data, checks convert + validate + pl
 
 ## The taxonomy (v0.1)
 
-One task: **detect follicular units and classify their hair count.** Your annotation directly
-trains the model that tells a surgeon how big a graft is.
+One task: **detect follicular units and classify their hair count.** The classes are exact
+counts — the number graft-size planning is based on. The converter reads each export's own
+`data.yaml` and maps its class names onto this taxonomy automatically.
 
 | Class | Hairs per unit |
 |---|---|
 | `fu1` | 1 |
-| `fu2` | 2–3 |
-| `fu3` | 4–5 |
-| `fu4` | 6+ |
-| `fu5` | cannot tell — blur, occlusion, motion, blown-out highlight |
+| `fu2` | 2 |
+| `fu3` | 3 |
+| `fu4` | 4 |
+| `fu5` | 5+ |
 
-`fu5` exists so the model can express uncertainty instead of guessing. Over-using it
-(>20% of a batch) means the image is bad — flag it.
+Uncountable units are skipped during labeling rather than guessed (see the annotation guide) —
+v0.1 has no "unsure" class; a missed unit shows up as a lower count, never a wrong label.
 
 ## How to add a dataset
 
@@ -75,9 +76,9 @@ trains the model that tells a surgeon how big a graft is.
 ## Status
 
 - [x] Manifest v0.1: license-clean public datasets identified (688 + 716 images)
-- [ ] Canonical release `follicle-obb-v0.1` (dedup check between two suspected-duplicate sources — first good issue)
-- [ ] Community labeling round 1 (target: 1,000 new images)
-- [ ] Benchmark harness in `follicle-detect/benchmark/`
+- [ ] Canonical release `follicle-v0.1` (dedup check between two suspected-duplicate sources — first good issue)
+- [ ] Community labeling round 1 (target: 1,000 newly labeled images)
+- [ ] Benchmark harness (the `follicle-detect/benchmark/` directory is itself an open contribution)
 
-**Month-3 goal:** the largest permissively-licensed follicular-unit dataset in existence,
+**Month-3 goal:** the largest permissively-licensed follicular-unit dataset we can get to,
 with a published validator others run against their own hospital datasets.

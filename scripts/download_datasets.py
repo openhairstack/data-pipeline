@@ -26,7 +26,7 @@ SOURCES = {
     "ranaudio-fu5": {
         "roboflow": ("ranaudio", "hair-follicle-detection-gjgak", 1),
         "license": "CC-BY-4.0",
-        "attribution": 'ranaoudio, "Hair Follicle Detection Dataset", Roboflow Universe (2025)',
+        "attribution": 'ranaudio, "Hair Follicle Detection Dataset", Roboflow Universe (2025)',
         "classes": ["1", "2", "3", "4", "5"],
         "export": "yolov8",
     },
@@ -157,7 +157,7 @@ def main() -> int:
     if failures:
         print(f"\n{len(failures)} source(s) failed: {', '.join(failures)}", file=sys.stderr)
         return 1
-    print("\nNext: python scripts/convert_to_yolo_obb.py --input", str(dest), "--output ./data/follicle-obb-v0.1")
+    print("\nNext: python scripts/convert_to_yolo.py --input", str(dest), "--output ./data/follicle-v0.1")
     return 0
 
 

@@ -4,12 +4,14 @@ Usage:
     python tests/test_pipeline.py            # uses a scratch dir in the system temp
     OHS_TEST_DIR=./scratch python tests/test_pipeline.py
 
-Creates a fake Roboflow export, runs convert_to_yolo_obb.py, validates the
-release (expect PASS), corrupts a label and validates again (expect FAIL),
-then smoke-tests scalp-analyzer's plan_simulation + _bar_chart (stdlib+PIL only).
+Creates a fake Roboflow export (data.yaml with class names "1".."5" and 0-based label ids,
+the way real Roboflow exports look), runs convert_to_yolo.py, validates the release
+(expect PASS), corrupts a label and validates again (expect FAIL), then smoke-tests
+scalp-analyzer's plan_simulation + _bar_chart (stdlib+PIL only).
 
-No third-party deps beyond Pillow; no GPU, no model weights, no network.
+No GPU, no model weights, no network.
 """
+import json
 import os
 import shutil
 import subprocess
@@ -21,11 +23,19 @@ PY = sys.executable
 REPOS = Path(__file__).resolve().parents[2]  # repos/
 BASE = Path(os.environ.get("OHS_TEST_DIR", Path(tempfile.gettempdir()) / "ohs-pipeline-test"))
 
-# ---------- fake roboflow export ----------
+if BASE.exists():
+    shutil.rmtree(BASE)
+
+# ---------- fake roboflow export (0-based ids, class names are the hair counts) ----------
 export = BASE / "raw" / "ranaudio-fu5"
 for split in ("train", "valid", "test"):
     (export / split / "images").mkdir(parents=True, exist_ok=True)
     (export / split / "labels").mkdir(parents=True, exist_ok=True)
+names = ["1", "2", "3", "4", "5"]
+(export / "data.yaml").write_text(
+    "names:\n" + "".join(f"  {i}: {n}\n" for i, n in enumerate(names)),
+    encoding="utf-8",
+)
 for i, split in enumerate(["train"] * 3 + ["valid"] + ["test"]):
     import random
 
@@ -37,28 +47,32 @@ for i, split in enumerate(["train"] * 3 + ["valid"] + ["test"]):
                  for _ in range(64 * 64)])
     img.save(export / split / "images" / f"img_{i}.jpg")
     labels = []
-    for cls in ["1", "2", "3", "4", "5"][: (i % 5) + 1]:
+    for cls in range((i % 5) + 1):  # 0-based ids, like a real Roboflow export
         labels.append(f"{cls} 0.5 0.5 0.1 0.1")
     (export / split / "labels" / f"img_{i}.txt").write_text("\n".join(labels) + "\n")
 
 print("=== 1. convert ===")
-r = subprocess.run([PY, str(REPOS / "data-pipeline/scripts/convert_to_yolo_obb.py"),
-                    "--input", str(BASE / "raw"), "--output", str(BASE / "follicle-obb-v0.1")],
+r = subprocess.run([PY, str(REPOS / "data-pipeline/scripts/convert_to_yolo.py"),
+                    "--input", str(BASE / "raw"), "--output", str(BASE / "follicle-v0.1")],
                    capture_output=True, text=True)
 print(r.stdout, r.stderr)
-assert (BASE / "follicle-obb-v0.1" / "dataset.yaml").exists(), "conversion produced no dataset.yaml"
+assert (BASE / "follicle-v0.1" / "dataset.yaml").exists(), "conversion produced no dataset.yaml"
+manifest = json.loads((BASE / "follicle-v0.1" / "manifest.json").read_text(encoding="utf-8"))
+totals = manifest["class_totals"]
+assert set(totals) == {"fu1", "fu2", "fu3", "fu4", "fu5"}, f"class mapping wrong: {totals}"
+assert totals == {"fu1": 5, "fu2": 4, "fu3": 3, "fu4": 2, "fu5": 1}, f"unexpected counts: {totals}"
 
 print("=== 2. validate clean release (expect PASS) ===")
 r = subprocess.run([PY, str(REPOS / "data-pipeline/scripts/validate_dataset.py"),
-                    "--path", str(BASE / "follicle-obb-v0.1")], capture_output=True, text=True)
+                    "--path", str(BASE / "follicle-v0.1")], capture_output=True, text=True)
 print(r.stdout, r.stderr)
 assert r.returncode in (0, 2), f"validator crashed: rc={r.returncode}"
 
 print("=== 3. break a label (expect FAIL, rc=1) ===")
-lbl = next((BASE / "follicle-obb-v0.1" / "labels" / "train").glob("*.txt"))
+lbl = next((BASE / "follicle-v0.1" / "labels" / "train").glob("*.txt"))
 lbl.write_text("9 0.5 0.5 5.0 0.1\nnot-a-label\n")  # out-of-range class + malformed line
 r = subprocess.run([PY, str(REPOS / "data-pipeline/scripts/validate_dataset.py"),
-                    "--path", str(BASE / "follicle-obb-v0.1")], capture_output=True, text=True)
+                    "--path", str(BASE / "follicle-v0.1")], capture_output=True, text=True)
 print(r.stdout[-800:], r.stderr)
 assert r.returncode == 1, "validator should fail on bad labels"
 

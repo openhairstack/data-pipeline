@@ -8,7 +8,7 @@ Checks:
   5. per-split and per-class instance counts vs dataset.yaml
 
 Usage:
-    python scripts/validate_dataset.py --path ./data/follicle-obb-v0.1 [--strict]
+    python scripts/validate_dataset.py --path ./data/follicle-v0.1 [--strict]
 
 Exit code 1 on any hard error (missing labels, format, split leakage); 2 on warnings-only.
 """

@@ -1,11 +1,16 @@
-"""Build a canonical YOLO release from raw downloads.
+"""Build a canonical YOLO release from raw downloads (v0.1 = axis-aligned detection).
 
 Usage:
-    python scripts/convert_to_yolo_obb.py --input ./data/raw --output ./data/follicle-obb-v0.1
-    python scripts/convert_to_yolo_obb.py --source ranaudio-fu5 --class-map 1:fu1,2:fu2,3:fu3,4:fu4,5:fu5
+    python scripts/convert_to_yolo.py --input ./data/raw --output ./data/follicle-v0.1
+    python scripts/convert_to_yolo.py --input ./data/raw --output ./data/follicle-v0.1 \
+        --class-map vera-fu2:follicle=fu1,follicles=fu2
 
 Roboflow exports look like:
     <export>/data.yaml, train/{images,labels}, valid/{images,labels}, test/{images,labels}
+
+Class mapping is automatic: the export's own `data.yaml` `names` is read, and numeric names
+("1".."5" = hair count per unit) map to fu1..fu5. Non-numeric taxonomies are skipped unless an
+override is passed (override format: `source:name=fuN,name=fuN`).
 
 This script copies every source export into a unified release dir:
     <output>/dataset.yaml, images/{train,val,test}, labels/{train,val,test}, manifest.json
@@ -21,19 +26,20 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+import yaml
+
 CANON = ["fu1", "fu2", "fu3", "fu4", "fu5"]
 # our split name -> Roboflow export split name
 SPLIT_DIR = {"train": "train", "val": "valid", "test": "test"}
 
-DEFAULT_CLASS_MAP: dict[str, dict[str, str]] = {
-    "ranaudio-fu5": {"1": "fu1", "2": "fu2", "3": "fu3", "4": "fu4", "5": "fu5"},
-    "purandhar-fu5": {"1": "fu1", "2": "fu2", "3": "fu3", "4": "fu4", "5": "fu5"},
-}
 
-
-def parse_class_map(spec: str) -> tuple[str, dict[str, str]]:
+def parse_override(spec: str) -> tuple[str, dict[str, str]]:
     src, _, rest = spec.partition(":")
-    return src, {p.split(":")[0].strip(): p.split(":")[1].strip() for p in rest.split(",")}
+    pairs: dict[str, str] = {}
+    for p in rest.split(","):
+        name, _, fu = p.partition("=")
+        pairs[name.strip()] = fu.strip()
+    return src, pairs
 
 
 def find_export(source_dir: Path) -> Path:
@@ -45,6 +51,31 @@ def find_export(source_dir: Path) -> Path:
         return hits[0].parent
     hits = [p for p in source_dir.rglob("train/images")]
     return hits[0].parent if hits else source_dir
+
+
+def load_names(export: Path) -> list[str]:
+    for fname in ("data.yaml", "dataset.yaml"):
+        path = export / fname
+        if path.exists():
+            meta = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            names = meta.get("names")
+            if isinstance(names, dict):
+                return [str(names[k]) for k in sorted(names)]
+            if isinstance(names, list):
+                return [str(n) for n in names]
+    return []
+
+
+def build_class_map(export: Path, override: dict[str, str] | None) -> dict[str, str]:
+    """source label id (str) -> canonical fuN, keyed off data.yaml class names."""
+    cmap: dict[str, str] = {}
+    for idx, name in enumerate(load_names(export)):
+        s = name.strip()
+        if override and s in override and override[s] in CANON:
+            cmap[str(idx)] = override[s]
+        elif s.isdigit() and 1 <= int(s) <= len(CANON):
+            cmap[str(idx)] = f"fu{int(s)}"
+    return cmap
 
 
 def rewrite_labels(lbl: Path, cmap: dict[str, str]) -> tuple[list[str], Counter]:
@@ -66,7 +97,8 @@ def main() -> int:
     ap.add_argument("--input", required=True, help="dir containing per-source export dirs")
     ap.add_argument("--output", required=True)
     ap.add_argument("--source", action="append", default=[], help="restrict to these source dirs")
-    ap.add_argument("--class-map", action="append", default=[], help="e.g. ranaudio-fu5:1:fu1,2:fu2")
+    ap.add_argument("--class-map", action="append", default=[],
+                    help="override, e.g. vera-fu2:follicle=fu1,follicles=fu2")
     args = ap.parse_args()
 
     root = Path(args.input)
@@ -75,26 +107,24 @@ def main() -> int:
         (out / "images" / split).mkdir(parents=True, exist_ok=True)
         (out / "labels" / split).mkdir(parents=True, exist_ok=True)
 
-    class_maps = dict(DEFAULT_CLASS_MAP)
+    overrides: dict[str, dict[str, str]] = {}
     for spec in args.class_map:
-        src, cmap = parse_class_map(spec)
-        class_maps[src] = cmap
+        src, pairs = parse_override(spec)
+        overrides[src] = pairs
 
-    sources = args.source or [
-        p.name for p in root.iterdir() if p.is_dir() and p.name not in ("manifest.json",)
-    ]
+    sources = args.source or [p.name for p in root.iterdir() if p.is_dir()]
 
     manifest: dict = {"classes": CANON, "sources": [], "notes": []}
     total: Counter = Counter()
 
     for src in sources:
-        cmap = class_maps.get(src)
+        export = find_export(root / src)
+        cmap = build_class_map(export, overrides.get(src))
         if not cmap:
-            print(f"[{src}] no class map; taxonomy unrecognized -> skipped "
-                  f"(pass --class-map {src}:1:fu1,...)", file=sys.stderr)
+            print(f"[{src}] no class map (names={load_names(export)}); taxonomy unrecognized "
+                  f"-> skipped (pass --class-map {src}:name=fu1,...)", file=sys.stderr)
             manifest["notes"].append(f"{src}: skipped, no class map")
             continue
-        export = find_export(root / src)
         counts: Counter = Counter()
         for our_split, src_split in SPLIT_DIR.items():
             img_root = export / src_split / "images"
@@ -117,8 +147,7 @@ def main() -> int:
                 counts.update(c)
         if counts:
             manifest["sources"].append(
-                {"name": src, "license": "CC-BY-4.0",
-                 "see": "DATASETS.md", "instances": dict(counts)}
+                {"name": src, "license": "see DATASETS.md", "instances": dict(counts)}
             )
             print(f"[{src}] {sum(counts.values())} instances {dict(counts)}")
             total.update(counts)
