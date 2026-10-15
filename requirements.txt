@@ -1,0 +1,5 @@
+# data-pipeline deps (keep light: this lib is stdlib-first)
+PyYAML==6.0.2
+Pillow==11.0.0
+# optional: only for --source downloads
+roboflow==1.1.41
