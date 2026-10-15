@@ -1,20 +1,35 @@
 # data-pipeline
 
-Consolidated, license-clean follicular-unit datasets + the tooling to validate, convert, and extend them.
+> **The foundation:** every openly-licensed hair-follicle dataset consolidated, validated,
+> and documented — plus the tools to build the biggest freely-usable scalp dataset in existence.
 
-**Why this repo exists:** every public follicle dataset today is scattered (Roboflow, university sites, paper appendices), inconsistently licensed, and unreproduced. The "model" is not the bottleneck — **a known-good, attributable, machine-readable dataset supply is**. This repo is the supply chain.
+### In plain English
 
-## Layout
+Hair grows in little bundles called *follicular units*, usually 1–6 hairs per bundle. How many
+hairs are in each bundle is the single most useful number in transplant work — the whole bundle
+moves as one unit, so the count decides graft size.
 
-```
-DATASETS.md              the manifest: every known dataset, its license, its status
-ANNOTATION_GUIDE.md      how to label follicular units (count-based taxonomy)
-schema/dataset_card.md   template every dataset must ship with
-scripts/download_datasets.py   fetch all "clean" sources in one shot
-scripts/validate_dataset.py    integrity + taxonomy + split-leak checks
-scripts/convert_to_yolo_obb.py COCO/COCO-JSON -> YOLO-OBB conversion
-scripts/import_labels.py       merge community annotations into a release
-```
+This repo exists because: the images that teach computers to see those bundles are scattered
+across the internet under inconsistent licenses, with nobody checking whether they're labeled
+correctly. We collect them, keep receipts (provenance + license), and ship a tool that catches
+broken data before it poisons a model.
+
+**You can help without writing code:** labeling is a 15-minute skill. Start with
+[ANNOTATION_GUIDE.md](ANNOTATION_GUIDE.md).
+
+---
+
+## What's inside
+
+| File | What it is |
+|---|---|
+| `DATASETS.md` | the manifest: every known public dataset, its license, its status |
+| `scripts/download_datasets.py` | fetches every license-clean source in one command |
+| `scripts/convert_to_yolo_obb.py` | builds a canonical release from any export |
+| `scripts/validate_dataset.py` | integrity + format + split-leakage checker |
+| `ANNOTATION_GUIDE.md` | how to label follicular units (the 15-minute skill) |
+| `schema/dataset_card.md` | provenance card every release must ship |
+| `tests/test_pipeline.py` | smoke test the whole flow on synthetic data |
 
 ## Quick start
 
@@ -24,42 +39,45 @@ pip install -r requirements.txt
 # 1. download all license-clean sources (~5 GB)
 python scripts/download_datasets.py --out ./data/raw --set clean
 
-# 2. convert + validate -> a canonical release
+# 2. convert + validate into a canonical release
 python scripts/convert_to_yolo_obb.py --input ./data/raw --output ./data/follicle-obb-v0.1
 python scripts/validate_dataset.py --path ./data/follicle-obb-v0.1
 ```
 
-Output release directory structure (YOLO-OBB, matches Ultralytics conventions):
-
-```
-follicle-obb-v0.1/
-  dataset.yaml          # names: [fu1, fu2, fu3, fu4, fu5], path, train/val/test
-  images/{train,val,test}/...
-  labels/{train,val,test}/...   # class cx cy w h angle (OBB format)
-  manifest.json         # provenance: source, license, attribution, hashes
+Run the tests without downloading anything:
+```bash
+python tests/test_pipeline.py   # synthetic data, checks convert + validate + planner logic
 ```
 
-## Taxonomy (v0.1)
+## The taxonomy (v0.1)
 
-One task: **detect follicular units and classify by hair count per unit.**
+One task: **detect follicular units and classify their hair count.** Your annotation directly
+trains the model that tells a surgeon how big a graft is.
 
-| Class | Meaning | Why it matters |
-|---|---|---|
-| `fu1` | unit with exactly 1 hair | small graft, high count, frontal work |
-| `fu2` | unit with 2–3 hairs* | medium graft |
-| `fu3` | unit with 4–5 hairs* | large graft, dense packing |
-| `fu4` | unit with 6+ hairs* | maximum graft |
-| `fu5` | ambiguous / unreadable | deliberate class for honesty — ambiguous crops exist |
+| Class | Hairs per unit |
+|---|---|
+| `fu1` | 1 |
+| `fu2` | 2–3 |
+| `fu3` | 4–5 |
+| `fu4` | 6+ |
+| `fu5` | cannot tell — blur, occlusion, motion, blown-out highlight |
 
-\* Exact bucket boundaries are set per dataset from the source annotations; see `DATASETS.md` for the active mapping. `fu5` exists so the model can express uncertainty instead of guessing.
+`fu5` exists so the model can express uncertainty instead of guessing. Over-using it
+(>20% of a batch) means the image is bad — flag it.
+
+## How to add a dataset
+
+1. Check the license on the project page — screenshot it in the PR.
+2. Add the entry to `DATASETS.md` (all fields) **before** any code references it.
+3. Add loader support in `download_datasets.py` behind a `--source <name>` flag.
+4. Convert → validate → hash → publish with a dataset card.
 
 ## Status
 
-- [x] Manifest v0.1: 2 license-clean public datasets identified (688 + 716 images)
-- [ ] Canonical release `follicle-obb-v0.1` (blocked on: dedup check between the two sources — see DATASETS.md issue #1)
+- [x] Manifest v0.1: license-clean public datasets identified (688 + 716 images)
+- [ ] Canonical release `follicle-obb-v0.1` (dedup check between two suspected-duplicate sources — first good issue)
 - [ ] Community labeling round 1 (target: 1,000 new images)
-- [ ] Benchmark harness lives in `follicle-detect/benchmark/` (cross-repo)
+- [ ] Benchmark harness in `follicle-detect/benchmark/`
 
-## The goal for this repo
-
-By month 3: the **largest permissively-licensed follicular-unit dataset in existence**, with a published validator others run against their own private hospitals datasets. The model follows the data, not the other way around.
+**Month-3 goal:** the largest permissively-licensed follicular-unit dataset in existence,
+with a published validator others run against their own hospital datasets.

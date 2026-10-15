@@ -28,7 +28,7 @@ Draw one box per follicular unit. Tag it by how many hair shafts you can *confid
 4. **Partial FUs at image edge:** label them normally if ≥1 shaft emergence is visible; skip if cut off before the pore.
 5. **Never guess follicle geometry under heavy scaling artifacts.** Digital trichoscopes (and phone macro shots) distort at frame edges.
 
-## Difficult calls (ask in Discord `#data` when unsure)
+## Difficult calls (ask in Discord `#data` or a GitHub issue when unsure)
 
 - **Hairs merging into a mat / afro texture:** label one `fu3` per merge point if you can see it, else `fu5`.
 - **Dense bald-region borders:** label FUs you can see; do not infer hidden ones.

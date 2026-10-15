@@ -46,7 +46,7 @@ Legend: ✅ license-clean and redistributable · ⚠️ usable, conditions apply
 
 - **Source:** paper code: https://github.com/Melonpoint/YOLO-OHFD (MDPI Applied Sciences 2025, open access)
 - **Status:** ❌ **not released.** The paper describes an OBB hair-follicle dataset + oriented detector; the repo is 3 stars, 2 commits, no release, no license. Prior art; we reimplement from the paper and cite it.
-- **Action:** email the corresponding author (see launch assets) inviting collaboration — this is the single most relevant research group.
+- **Action:** DM the corresponding author on X (draft in `launch-assets/dm-outreach/`) inviting collaboration — this is the single most relevant research group.
 
 ---
 
