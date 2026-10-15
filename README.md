@@ -82,3 +82,11 @@ v0.1 has no "unsure" class; a missed unit shows up as a lower count, never a wro
 
 **Month-3 goal:** the largest permissively-licensed follicular-unit dataset we can get to,
 with a published validator others run against their own hospital datasets.
+
+---
+
+### Questions & Community Support
+
+Interested in contributing datasets or annotations?
+* **Connect with Salik Shah:** [DM @salik on X](https://x.com/salik)
+* **Discussions:** [GitHub Discussions](https://github.com/orgs/openhairstack/discussions)
